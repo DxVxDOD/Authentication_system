@@ -38,7 +38,9 @@ const UserQuery = new GraphQLObjectType({
 
 				if (error) {
 					throw new GraphQLError(
-						"You do not have access ! " + error.message
+						"You do not have access ! " +
+							error.message +
+							error.cause
 					);
 				}
 				const users = User.find({});

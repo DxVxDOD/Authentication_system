@@ -7,7 +7,6 @@ export function tokenExtractor(rawToken: string) {
 	if (!rawToken.startsWith("Bearer ")) {
 		throw new Error("Authorization header is formatted incorrectly.");
 	}
-	rawToken.replace("Bearer ", "");
 
-	return rawToken;
+	return rawToken.replace("Bearer ", "");
 }
