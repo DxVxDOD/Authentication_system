@@ -5,3 +5,4 @@ dotenv.config();
 
 export const PORT = stringParser(process.env.PORT) || 3000;
 export const MONGO_URI = stringParser(process.env.MONGO_URI);
+export const SECRET = stringParser(process.env.SECRET);

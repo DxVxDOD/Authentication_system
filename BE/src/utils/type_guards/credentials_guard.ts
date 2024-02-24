@@ -1,20 +1,18 @@
-import { TUser } from "../../types/user";
+import { TCredentials } from "../../types/credentials";
 
-export function isNewUser(obj: Partial<TUser>) {
+export function isCredentials(obj: Partial<TCredentials>) {
 	if (!obj || typeof obj !== "object") {
 		throw new Error("Error object doesn't exist" + obj);
 	}
 
-	const schema: Record<keyof TUser, string> = {
+	const schema: Record<keyof TCredentials, string> = {
 		username: "string",
-		email: "string",
 		password: "string",
-		fullName: "string",
 	};
 
 	const missingProperties = Object.keys(schema)
-		.filter((key) => obj[key as keyof Partial<TUser>] === undefined)
-		.map((key) => key as keyof TUser)
+		.filter((key) => obj[key as keyof Partial<TCredentials>] === undefined)
+		.map((key) => key as keyof TCredentials)
 		.map((key) => {
 			throw new Error(`Object is missing ${key} ${schema[key]}`);
 		});
