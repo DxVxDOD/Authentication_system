@@ -1,7 +1,7 @@
 import { graphqlRequestBaseQuery } from "@rtk-query/graphql-request-base-query";
 import { createApi } from "@reduxjs/toolkit/query/react";
 import { RootState } from "./store";
-import { TCredentials, TLoggedUser, TSignUp, TUser } from "../types/user";
+import { TCredentials, TLoggedUser, TSignUp } from "../types/user";
 import { gql } from "graphql-request";
 
 export const baseApi = createApi({
@@ -17,7 +17,7 @@ export const baseApi = createApi({
 		},
 	}),
 	endpoints: (builder) => ({
-		addUser: builder.mutation<TUser, TSignUp>({
+		signUp: builder.mutation<TLoggedUser, TSignUp>({
 			query: ({ username, password, fullName, email }) => ({
 				document: gql`
 					mutation addUser(
@@ -35,6 +35,7 @@ export const baseApi = createApi({
 							username
 							fullName
 							email
+							token
 							id
 						}
 					}
@@ -46,11 +47,15 @@ export const baseApi = createApi({
 					email,
 				},
 			}),
+			transformResponse: (response: { addUser: TLoggedUser }) => {
+				console.log(response);
+				return response.addUser;
+			},
 		}),
-		login: builder.query<TLoggedUser, TCredentials>({
+		login: builder.mutation<TLoggedUser, TCredentials>({
 			query: ({ username, password }) => ({
 				document: gql`
-					query login($username: String!, $password: String!) {
+					mutation login($username: String!, $password: String!) {
 						login(username: $username, password: $password) {
 							username
 							fullName
@@ -65,8 +70,20 @@ export const baseApi = createApi({
 					password,
 				},
 			}),
+			transformResponse: (response: { login: TLoggedUser }) =>
+				response.login,
+			transformErrorResponse: (response: { message: string }) => {
+				const message = response.message
+					.split(":")
+					.slice(0, 2)
+					.join(": ");
+
+				console.log(message);
+
+				return message;
+			},
 		}),
 	}),
 });
 
-export const { useAddUserMutation } = baseApi;
+export const { useSignUpMutation, useLoginMutation } = baseApi;

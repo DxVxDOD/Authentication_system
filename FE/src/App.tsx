@@ -1,5 +1,6 @@
-import { Box, CssBaseline } from "@mui/material";
 import SignUp from "./components/SignUp";
+import Login from "./components/Login";
+import { Box, CssBaseline } from "@mui/material";
 
 function App() {
 	return (
@@ -16,6 +17,7 @@ function App() {
 			component={"main"}>
 			<CssBaseline />
 			<SignUp />
+			<Login />
 		</Box>
 	);
 }

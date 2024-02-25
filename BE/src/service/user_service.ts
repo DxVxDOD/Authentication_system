@@ -6,6 +6,9 @@ import { wrapInPromise } from "../utils/wrap_in_promise";
 import jwt from "jsonwebtoken";
 import * as argon2 from "argon2";
 import { credentialsParser } from "../utils/parsers/credentials_parser";
+import { TCredentials } from "../types/credentials";
+import Access from "../models/access_model";
+import { stringParser } from "../utils/parsers/general_parsers";
 
 export async function newUserService(data: Partial<TUser>) {
 	const { data: newUserData, error: newUserDataError } = await wrapInPromise(
@@ -92,16 +95,92 @@ export async function newUserService(data: Partial<TUser>) {
 		);
 	}
 
-	return savedNewUser;
+	const { data: loggedUser, error: loggedUserError } = await wrapInPromise(
+		loginService({
+			username: savedNewUser.username,
+			password: newUserData.password,
+		})
+	);
+
+	if (!loggedUser || loggedUserError) {
+		throw new Error("New user cannot log in: " + loggedUserError.message);
+	}
+
+	return loggedUser;
 }
 
-export async function loginService(data: Partial<TUser>) {
+async function createAccess(remoteAddress: string) {
+	console.log(remoteAddress);
+
+	const attempts = new Access({
+		attempts: 0,
+		remoteAddress,
+		access: true,
+	});
+
+	const { data: accessData, error: accessError } = await wrapInPromise(
+		attempts.save()
+	);
+
+	if (!accessData || accessError) {
+		throw new Error("Field to save attempt details " + accessError.message);
+	}
+
+	return accessData;
+}
+
+async function checkAttempt(remoteAddress: string | undefined) {
+	const remoteAddressString = stringParser(remoteAddress);
+
+	const { data: attemptArray, error: attemptArrayError } =
+		await wrapInPromise(Access.find({}));
+
+	if (!attemptArray || attemptArrayError) {
+		throw new Error("Error while fetching attempts" + attemptArrayError);
+	}
+
+	const attempt = attemptArray.find(
+		(at) => at.remoteAddress === remoteAddress
+	);
+
+	if (!attempt) {
+		console.log("triggered");
+		const { data, error } = await wrapInPromise(
+			createAccess(remoteAddressString)
+		);
+
+		if (!data || error) {
+			console.log("error", error);
+			throw new Error("Filed to log attempts: " + error.message);
+		}
+
+		return data;
+	} else {
+		if (attempt.attempts > 4) {
+			attempt.access = false;
+			throw new Error("Block further attempts");
+		}
+		return attempt;
+	}
+}
+
+export async function loginService(data: TCredentials, remoteAddress?: string) {
 	const { data: userClient, error: userClientError } = await wrapInPromise(
 		credentialsParser(data)
 	);
 
 	if (!userClient || userClientError) {
-		throw new Error("Wrong credentials: " + userClientError.message);
+		throw new Error(
+			"Wrongly formatted credentials: " + userClientError.message
+		);
+	}
+
+	const { data: attempt, error: attemptError } = await wrapInPromise(
+		checkAttempt(remoteAddress)
+	);
+
+	if (!attempt || attemptError) {
+		throw new Error("Failed to log attempts: " + attemptError.message);
 	}
 
 	const { data: userDB, error: userDBError } = await wrapInPromise(
@@ -109,17 +188,46 @@ export async function loginService(data: Partial<TUser>) {
 	);
 
 	if (!userDB || userDBError) {
+		attempt.attempts = attempt.attempts + 1;
+
+		const { data, error } = await wrapInPromise(attempt.save());
+
+		if (!data || error) {
+			throw new Error("Failed saving new failed attempt: " + error);
+		}
+
 		throw new Error(
-			"Cannot find user based on provided fields: " + userDBError
+			`${attempt.attempts}: Cannot find user based on username: ` +
+				userDBError
 		);
 	}
 
-	const { error: passwordError } = await wrapInPromise(
+	const { data: password, error: passwordError } = await wrapInPromise(
 		argon2.verify(userDB.password, userClient.password)
 	);
 
-	if (passwordError) {
-		throw new Error("Wrong password provided: " + passwordError.message);
+	if (!password || passwordError) {
+		attempt.attempts = attempt.attempts + 1;
+
+		const { data, error } = await wrapInPromise(attempt.save());
+
+		if (!data || error) {
+			throw new Error(
+				`${attempt.attempts}:Failed saving new failed attempt: ` + error
+			);
+		}
+
+		throw new Error("Wrong password provided: " + userClient.password);
+	}
+
+	attempt.attempts = 0;
+	attempt.access = false;
+	const { error: successfulLoginError } = await wrapInPromise(attempt.save());
+
+	if (successfulLoginError) {
+		throw new Error(
+			"Failed saving new failed attempt: " + successfulLoginError
+		);
 	}
 
 	const token = jwt.sign(
