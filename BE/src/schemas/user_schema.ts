@@ -1,5 +1,7 @@
 import {
+	GraphQLBoolean,
 	GraphQLError,
+	GraphQLInt,
 	GraphQLList,
 	GraphQLNonNull,
 	GraphQLObjectType,
@@ -8,10 +10,12 @@ import {
 } from "graphql";
 import User from "../models/user_model";
 import { wrapInPromise } from "../utils/wrap_in_promise";
-import { loginService, newUserService } from "../service/user_service";
+import { newUserService } from "../service/user_service";
 import { TCredentials } from "../types/credentials";
 import { userExtractor } from "../utils/middleware/user_extractor";
 import { TUser } from "../types/user";
+import { loginService } from "../service/login-service";
+import { enableFields } from "../service/access_service";
 
 const UserType = new GraphQLObjectType({
 	name: "User",
@@ -22,6 +26,15 @@ const UserType = new GraphQLObjectType({
 		username: { type: GraphQLString },
 		email: { type: GraphQLString },
 		token: { type: GraphQLString },
+	}),
+});
+
+const AccessType = new GraphQLObjectType({
+	name: "Access",
+	fields: () => ({
+		attempts: { type: GraphQLInt },
+		remoteAddress: { type: GraphQLString },
+		access: { type: GraphQLBoolean },
 	}),
 });
 
@@ -62,9 +75,9 @@ const mutation = new GraphQLObjectType({
 				fullName: { type: new GraphQLNonNull(GraphQLString) },
 				email: { type: new GraphQLNonNull(GraphQLString) },
 			},
-			async resolve(_parent, args: Partial<TUser>) {
+			async resolve(_parent, args: Partial<TUser>, context) {
 				const { data, error } = await wrapInPromise(
-					newUserService(args)
+					newUserService(args, context.request.socket.remoteAddress)
 				);
 				if (!data || error) {
 					throw new GraphQLError(error.message);
@@ -87,6 +100,18 @@ const mutation = new GraphQLObjectType({
 					throw new GraphQLError(error.message);
 				}
 
+				return data;
+			},
+		},
+		enableFields: {
+			type: AccessType,
+			async resolve(_parent, _args, context) {
+				const { data, error } = await wrapInPromise(
+					enableFields(context.request.socket.remoteAddress)
+				);
+				if (!data || error) {
+					throw new GraphQLError(error.message);
+				}
 				return data;
 			},
 		},
