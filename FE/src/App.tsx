@@ -1,14 +1,8 @@
 import SignUp from "./components/SignUp";
 import Login from "./components/Login";
-import {
-	Box,
-	CssBaseline,
-	ThemeProvider,
-	createTheme,
-	useMediaQuery,
-} from "@mui/material";
+import { Box, CssBaseline, ThemeProvider, createTheme } from "@mui/material";
 import { Route, Routes } from "react-router-dom";
-import { blueGrey, grey } from "@mui/material/colors";
+import { blueGrey } from "@mui/material/colors";
 import { Toaster } from "react-hot-toast";
 import { useEffect } from "react";
 import { setUser } from "./redux/slices/auth";
@@ -17,17 +11,13 @@ import LoggedIn from "./components/LoggedIn";
 import { useAuth } from "./hooks/useAuth";
 
 function App() {
-	const prefersDarkMode = useMediaQuery("(prefers-color-scheme: dark)");
 	const dispatch = useAppDispatch();
 
 	const theme = createTheme({
 		palette: {
-			mode: prefersDarkMode ? "dark" : "light",
+			mode: "dark",
 			primary: {
 				main: blueGrey.A700,
-			},
-			text: {
-				primary: grey.A200,
 			},
 		},
 	});

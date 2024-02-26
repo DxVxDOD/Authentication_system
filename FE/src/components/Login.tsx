@@ -85,7 +85,7 @@ export default function Login() {
 		<Container
 			component="main"
 			maxWidth="xs">
-			{LoginData ? (
+			{LoginData && (
 				<Paper
 					elevation={2}
 					sx={{
@@ -95,8 +95,6 @@ export default function Login() {
 					}}>
 					<Typography>{LoginData.username} is logged in</Typography>
 				</Paper>
-			) : (
-				""
 			)}
 			<Paper
 				className={isLoginLoading ? "loading_animation" : ""}
