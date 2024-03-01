@@ -1,20 +1,31 @@
-import http from "http";
-import { stringParser } from "./utils/parsers/general_parsers";
-import { createHandler } from "graphql-http/lib/use/http";
-import user from "./schemas/user_schema";
+import express from "express";
+import cors from "cors";
+import { requestLogger } from "./utils/middleware/logger";
+import { createHandler } from "graphql-http";
+import schema from "./schemas/user_schema";
+import { Redis } from "ioredis";
+import rateLimit from "express-rate-limit";
 
-const app = http.createServer((request, response) => {
-	const url = stringParser(request.url);
-	if (url === "/graphql") {
-		const handler = createHandler({
-			schema: user,
-			context: { request, response },
-		});
-		handler(request, response);
-	} else {
-		response.writeHead(404, { "Content-Type": "application/json" });
-		response.end(JSON.stringify({ error: "Unknown endpoint" }));
-	}
+const app = express();
+
+const redis = new Redis();
+const loginLimiter = new rateLimit({ max: 5, windowMs: 1000 * 60 * 10 });
+
+const maxNumberOfFailedLogins = 5;
+const timeWindowForFailedLogins = 60 * 60 * 1;
+
+app.use(cors());
+app.use(express.json());
+app.use(express.static("dist"));
+
+app.all("/graphql", loginLimiter, async (request, response) =>
+  createHandler({ schema, context: { request, response } }),
+);
+
+app.get("/*", (_request, response) => {
+  response.sendFile("/index.html", { root: "./dist" });
 });
+
+app.use(requestLogger);
 
 export default app;

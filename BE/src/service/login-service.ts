@@ -10,140 +10,138 @@ import * as argon2 from "argon2";
 import { TLoginUser } from "../types/user";
 
 async function createAccess(remoteAddress: string) {
-	console.log(remoteAddress);
+  console.log(remoteAddress);
 
-	const attempts = new Access({
-		attempts: 0,
-		remoteAddress,
-		access: true,
-	});
+  const attempts = new Access({
+    attempts: 0,
+    remoteAddress,
+    access: true,
+  });
 
-	const { data: accessData, error: accessError } = await wrapInPromise(
-		attempts.save()
-	);
+  const { data: accessData, error: accessError } = await wrapInPromise(
+    attempts.save(),
+  );
 
-	if (!accessData || accessError) {
-		throw new Error("Field to save attempt details " + accessError.message);
-	}
+  if (!accessData || accessError) {
+    throw new Error("Field to save attempt details " + accessError.message);
+  }
 
-	return accessData;
+  return accessData;
 }
 
 async function checkAttempt(remoteAddress: string | undefined) {
-	const remoteAddressString = stringParser(remoteAddress);
+  const remoteAddressString = stringParser(remoteAddress);
 
-	const { data: attemptArray, error: attemptArrayError } =
-		await wrapInPromise(Access.find({}));
+  const { data: attemptArray, error: attemptArrayError } = await wrapInPromise(
+    Access.find({}),
+  );
 
-	if (!attemptArray || attemptArrayError) {
-		throw new Error("Error while fetching attempts" + attemptArrayError);
-	}
+  if (!attemptArray || attemptArrayError) {
+    throw new Error("Error while fetching attempts" + attemptArrayError);
+  }
 
-	const attempt = attemptArray.find(
-		(at) => at.remoteAddress === remoteAddress
-	);
+  const attempt = attemptArray.find((at) => at.remoteAddress === remoteAddress);
 
-	if (!attempt) {
-		console.log("triggered");
-		const { data, error } = await wrapInPromise(
-			createAccess(remoteAddressString)
-		);
+  if (!attempt) {
+    console.log("triggered");
+    const { data, error } = await wrapInPromise(
+      createAccess(remoteAddressString),
+    );
 
-		if (!data || error) {
-			console.log("error", error);
-			throw new Error("Filed to log attempts: " + error.message);
-		}
+    if (!data || error) {
+      console.log("error", error);
+      throw new Error("Filed to log attempts: " + error.message);
+    }
 
-		return data;
-	} else {
-		if (attempt.attempts > 3) {
-			attempt.access = false;
-			throw new Error("Block further attempts");
-		}
-		return attempt;
-	}
+    return data;
+  } else {
+    if (attempt.attempts > 3) {
+      attempt.access = false;
+      throw new Error("Block further attempts");
+    }
+    return attempt;
+  }
 }
 
 export async function loginService(data: TCredentials, remoteAddress: string) {
-	const { data: userClient, error: userClientError } = await wrapInPromise(
-		credentialsParser(data)
-	);
+  const { data: userClient, error: userClientError } = await wrapInPromise(
+    credentialsParser(data),
+  );
 
-	if (!userClient || userClientError) {
-		throw new Error(
-			"Wrongly formatted credentials: " + userClientError.message
-		);
-	}
+  if (!userClient || userClientError) {
+    throw new Error(
+      "Wrongly formatted credentials: " + userClientError.message,
+    );
+  }
 
-	const { data: attempt, error: attemptError } = await wrapInPromise(
-		checkAttempt(remoteAddress)
-	);
+  const { data: attempt, error: attemptError } = await wrapInPromise(
+    checkAttempt(remoteAddress),
+  );
 
-	if (!attempt || attemptError) {
-		throw new Error("Failed to log attempts: " + attemptError.message);
-	}
+  if (!attempt || attemptError) {
+    throw new Error("Failed to log attempts: " + attemptError.message);
+  }
 
-	const { data: userDB, error: userDBError } = await wrapInPromise(
-		User.findOne({ username: userClient.username })
-	);
+  const { data: userDB, error: userDBError } = await wrapInPromise(
+    User.findOne({ username: userClient.username }),
+  );
 
-	if (!userDB || userDBError) {
-		attempt.attempts = attempt.attempts + 1;
+  if (!userDB || userDBError) {
+    attempt.attempts = attempt.attempts + 1;
 
-		const { data, error } = await wrapInPromise(attempt.save());
+    const { data, error } = await wrapInPromise(attempt.save());
 
-		if (!data || error) {
-			throw new Error("Failed saving new failed attempt: " + error);
-		}
+    if (!data || error) {
+      throw new Error("Failed saving new failed attempt: " + error);
+    }
 
-		throw new Error(
-			`${attempt.attempts}: Cannot find user based on username: ` +
-				userDBError
-		);
-	}
+    throw new Error(
+      `${attempt.attempts}: Cannot find user based on username: ` + userDBError,
+    );
+  }
 
-	const { data: password, error: passwordError } = await wrapInPromise(
-		argon2.verify(userDB.password, userClient.password)
-	);
+  const { data: password, error: passwordError } = await wrapInPromise(
+    argon2.verify(userDB.password, userClient.password),
+  );
 
-	if (!password || passwordError) {
-		attempt.attempts = attempt.attempts + 1;
+  if (!password || passwordError) {
+    attempt.attempts = attempt.attempts + 1;
 
-		const { data, error } = await wrapInPromise(attempt.save());
+    const { data, error } = await wrapInPromise(attempt.save());
 
-		if (!data || error) {
-			throw new Error(
-				`${attempt.attempts}:Failed saving new failed attempt: ` + error
-			);
-		}
+    if (!data || error) {
+      throw new Error(
+        `${attempt.attempts}:Failed saving new failed attempt: ` + error,
+      );
+    }
 
-		throw new Error("Wrong password provided: " + userClient.password);
-	}
+    throw new Error("Wrong password provided: " + userClient.password);
+  }
 
-	attempt.attempts = 0;
-	attempt.access = false;
-	const { error: successfulLoginError } = await wrapInPromise(attempt.save());
+  attempt.attempts = 0;
+  attempt.access = false;
+  const { error: successfulLoginError } = await wrapInPromise(attempt.save());
 
-	if (successfulLoginError) {
-		throw new Error(
-			"Failed saving new failed attempt: " + successfulLoginError
-		);
-	}
+  if (successfulLoginError) {
+    throw new Error(
+      "Failed saving new failed attempt: " + successfulLoginError,
+    );
+  }
 
-	const token = jwt.sign(
-		{
-			username: userDB.username,
-			id: userDB.id,
-		},
-		SECRET
-	);
-	const user: TLoginUser = {
-		username: userDB.username,
-		email: userDB.email,
-		fullName: userDB.fullName,
-		token,
-		id: userDB.id,
-	};
+  const token = jwt.sign(
+    {
+      username: userDB.username,
+      id: userDB.id,
+    },
+    SECRET,
+  );
+  const user: TLoginUser = {
+    username: userDB.username,
+    email: userDB.email,
+    fullName: userDB.fullName,
+    token,
+    id: userDB.id,
+  };
 
-	return user;
+  return user;
 }

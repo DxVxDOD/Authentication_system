@@ -11,64 +11,49 @@ import LoggedIn from "./components/LoggedIn";
 import { useAuth } from "./hooks/useAuth";
 
 function App() {
-	const dispatch = useAppDispatch();
+  const dispatch = useAppDispatch();
 
-	const theme = createTheme({
-		palette: {
-			mode: "dark",
-			primary: {
-				main: blueGrey.A700,
-			},
-		},
-	});
+  const theme = createTheme({
+    palette: {
+      mode: "dark",
+      primary: { main: blueGrey.A700 },
+    },
+  });
 
-	useEffect(() => {
-		const loggedUserJSON = window.localStorage.getItem("logged_in_user");
-		if (loggedUserJSON !== null) {
-			const loggedUser = JSON.parse(loggedUserJSON);
-			dispatch(setUser(loggedUser));
-		}
-	}, [dispatch]);
+  useEffect(() => {
+    const loggedUserJSON = window.localStorage.getItem("logged_in_user");
+    if (loggedUserJSON !== null) {
+      const loggedUser = JSON.parse(loggedUserJSON);
+      dispatch(setUser(loggedUser));
+    }
+  }, [dispatch]);
 
-	const { user } = useAuth();
+  const { user } = useAuth();
 
-	return (
-		<ThemeProvider theme={theme}>
-			<Box
-				sx={{
-					width: "100vw",
-					height: "100vh",
-					display: "flex",
-					flexDirection: "column",
-					justifyContent: "center",
-					alignItems: "center",
-				}}
-				component={"main"}>
-				<Toaster
-					position="top-center"
-					reverseOrder={false}
-				/>
+  return (
+    <ThemeProvider theme={theme}>
+      <Box
+        sx={{
+          width: "100vw",
+          height: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+        component={"main"}
+      >
+        <Toaster position="top-center" reverseOrder={false} />
 
-				<CssBaseline />
-				<Routes>
-					<Route
-						path="/sign-up"
-						element={<SignUp />}
-					/>
-					<Route
-						path="/"
-						element={<Login />}
-					/>
-					{user && (
-						<Route
-							path="/logged-in"
-							element={<LoggedIn />}
-						/>
-					)}
-				</Routes>
-			</Box>
-		</ThemeProvider>
-	);
+        <CssBaseline />
+        <Routes>
+          <Route path="/sign-up" element={<SignUp />} />
+          <Route path="/" element={<Login />} />
+          {user && <Route path="/logged-in" element={<LoggedIn />} />}
+        </Routes>
+      </Box>
+    </ThemeProvider>
+  );
 }
 
 export default App;
