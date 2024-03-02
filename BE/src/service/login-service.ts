@@ -9,15 +9,9 @@ import jwt from "jsonwebtoken";
 import * as argon2 from "argon2";
 import { TLoginUser } from "../types/user";
 import { Redis } from "ioredis";
-import rateLimit from "express-rate-limit";
 
 const redis = new Redis();
-const loginRateLimiter = new rateLimit({
-  max: 5,
-  windowMs: 1000 * 60 * 10,
-});
 
-const maxNumOffFailedLogins = 5;
 const timeWindowForFatiledLogins = 60 * 60 * 1;
 
 async function createAccess(remoteAddress: string) {
