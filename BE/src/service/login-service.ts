@@ -3,15 +3,24 @@ import User from "../models/user_model";
 import { TCredentials } from "../types/credentials";
 import { SECRET } from "../utils/config";
 import { credentialsParser } from "../utils/parsers/credentials_parser";
-import { stringParser } from "../utils/parsers/general_parsers";
+import { numberParser, stringParser } from "../utils/parsers/general_parsers";
 import { wrapInPromise } from "../utils/wrap_in_promise";
 import jwt from "jsonwebtoken";
 import * as argon2 from "argon2";
 import { TLoginUser } from "../types/user";
+import { Redis } from "ioredis";
+import rateLimit from "express-rate-limit";
+
+const redis = new Redis();
+const loginRateLimiter = new rateLimit({
+  max: 5,
+  windowMs: 1000 * 60 * 10,
+});
+
+const maxNumOffFailedLogins = 5;
+const timeWindowForFatiledLogins = 60 * 60 * 1;
 
 async function createAccess(remoteAddress: string) {
-  console.log(remoteAddress);
-
   const attempts = new Access({
     attempts: 0,
     remoteAddress,
@@ -74,6 +83,12 @@ export async function loginService(data: TCredentials, remoteAddress: string) {
     );
   }
 
+  let userAttempts = numberParser(await redis.get(userClient.username));
+
+  if (userAttempts > 5) {
+    throw new Error("Block further attempts");
+  }
+
   const { data: attempt, error: attemptError } = await wrapInPromise(
     checkAttempt(remoteAddress),
   );
@@ -107,6 +122,13 @@ export async function loginService(data: TCredentials, remoteAddress: string) {
   if (!password || passwordError) {
     attempt.attempts = attempt.attempts + 1;
 
+    await redis.set(
+      userClient.username,
+      ++userAttempts,
+      "EX",
+      timeWindowForFatiledLogins,
+    );
+
     const { data, error } = await wrapInPromise(attempt.save());
 
     if (!data || error) {
@@ -119,7 +141,7 @@ export async function loginService(data: TCredentials, remoteAddress: string) {
   }
 
   attempt.attempts = 0;
-  attempt.access = false;
+  attempt.access = true;
   const { error: successfulLoginError } = await wrapInPromise(attempt.save());
 
   if (successfulLoginError) {
@@ -127,6 +149,8 @@ export async function loginService(data: TCredentials, remoteAddress: string) {
       "Failed saving new failed attempt: " + successfulLoginError,
     );
   }
+
+  await redis.del(userClient.username);
 
   const token = jwt.sign(
     {
